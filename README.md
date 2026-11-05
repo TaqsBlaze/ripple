@@ -12,7 +12,7 @@ Pair once, stay in control, and keep the cloud out of the transfer.
 ![Transport: local network](https://img.shields.io/badge/transport-local%20network-4C9AFF?style=for-the-badge)
 ![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--only-white?style=for-the-badge)
 
-[Explore features](#what-works-today) · [Get started](#get-started) · [Development board](#development-board) · [Contribute](#contributing)
+[Explore features](#what-works-today) · [Get started](#get-started) · [Development board](#development-board) · [Design & workflow](#design--workflow) · [Contribute](#contributing)
 
 ![Ripple on desktop and Android](image/display.png)
 
@@ -59,16 +59,11 @@ Ripple brings your phone and desktop together without requiring an account or an
 
 These columns describe the repository’s current state and direction, not a release schedule.
 
-## How it fits together
+## Design & workflow
 
-```text
- Android phone                                  Linux desktop
-┌───────────────────────┐                    ┌─────────────────────────┐
-│ React + Capacitor UI  │                    │ Qt Quick desktop UI     │
-│ Kotlin native bridge  │◄── signed HTTPS ──►│ Go service              │
-│ Keystore + SAF        │     over local LAN │ pairing + transfer state│
-└───────────────────────┘                    └─────────────────────────┘
-```
+Ripple pairs devices with an expiring QR invitation and explicit desktop approval. Once paired, either device can offer a file; the receiver approves it or applies its trusted-device auto-accept setting. The transfer finishes with a hash check and receipt.
+
+![Ripple workflow: pairing, bidirectional offers, approval, verification, and delivery](image/workflow.svg)
 
 Android initiates the network connection; the PC does not need to connect to a listening port on the phone. File bytes stay in the native transfer code rather than crossing the JavaScript bridge. See the [protocol](Linux/ripple/docs/protocol-v1.md) for the current wire contract.
 

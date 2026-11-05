@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1290" viewBox="0 0 1200 1290" role="img" aria-labelledby="title desc"><title id="title">Ripple — pairing and file transfer workflow</title><desc id="desc">Pair by scanning the PC invitation and approving Android. For PC-to-Android transfers, Android polls and downloads. For Android-to-PC transfers, Android uploads. Both paths require receiver approval or auto-accept, temporary storage, verification, and a receipt. Android initiates all network requests.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#8892a6"/></marker><linearGradient id="accent"><stop stop-color="#aa9aff"/><stop offset="1" stop-color="#70d9cb"/></linearGradient></defs><rect width="1200" height="1290" rx="24" fill="#0c1018"/><style>text{font-family:DejaVu Sans,sans-serif}.title{fill:#f4f6fb;font-size:34px;font-weight:700}.sub{fill:#aab5c8;font-size:17px}.label{fill:#a99fff;font-size:13px;font-weight:700;letter-spacing:1.5px}.head{fill:#f4f6fb;font-size:19px;font-weight:700}.body{fill:#bdc7d8;font-size:15px}.small{fill:#aab5c8;font-size:14px}</style>
+<rect x="48" y="40" width="64" height="4" rx="2" fill="url(#accent)"/>
+<text x="48" y="94" class="title">From pairing to delivery</text>
+<text x="48" y="129" class="sub">Ripple connects Android and Linux over your local network.</text>
+<text x="48" y="185" class="label">01  /  ESTABLISH TRUST</text>
+<text x="48" y="213" class="sub">Pair once. Future connections verify the saved device identities.</text>
+<rect x="48" y="235" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="68" y="263" class="label">ON LINUX</text>
+<text x="68" y="293" class="head">Show the invitation</text>
+<text x="68" y="323" class="body">The PC displays an expiring</text>
+<text x="68" y="345" class="body">QR code with its pinned identity.</text>
+<rect x="434" y="235" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="454" y="263" class="label">ON ANDROID</text>
+<text x="454" y="293" class="head">Scan and request pairing</text>
+<text x="454" y="323" class="body">Android verifies the PC identity</text>
+<text x="454" y="345" class="body">and requests enrollment.</text>
+<rect x="820" y="235" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="840" y="263" class="label">ON BOTH DEVICES</text>
+<text x="840" y="293" class="head">Approve and verify</text>
+<text x="840" y="323" class="body">Approve the phone on the PC.</text>
+<text x="840" y="345" class="body">Android proves ownership of its key.</text>
+<path d="M388 303H424V303" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M774 303H810V303" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="48" y="428" class="label">02  /  CHOOSE A DIRECTION</text>
+<text x="48" y="456" class="sub">The receiver accepts the offer, or uses its trusted-device auto-accept policy.</text>
+<rect x="48" y="480" width="1104" height="228" rx="14" fill="#101924" stroke="#283c50"/>
+<text x="68" y="511" class="label">PC → ANDROID</text>
+<rect x="68" y="532" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="88" y="560" class="label">SENDER · PC</text>
+<text x="88" y="590" class="head">Choose or drop a file</text>
+<text x="88" y="620" class="body">The PC hashes the source file</text>
+<text x="88" y="642" class="body">and saves an offer for the phone.</text>
+<rect x="434" y="532" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="454" y="560" class="label">RECEIVER · ANDROID</text>
+<text x="454" y="590" class="head">Find and accept the offer</text>
+<text x="454" y="620" class="body">Android polls while Ripple is open.</text>
+<text x="454" y="642" class="body">Approval happens on the phone.</text>
+<rect x="800" y="532" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="820" y="560" class="label">ANDROID INITIATES</text>
+<text x="820" y="590" class="head">Download the file</text>
+<text x="820" y="620" class="body">Android pulls sequential chunks</text>
+<text x="820" y="642" class="body">from the PC over signed HTTPS.</text>
+<path d="M406 600H424V600" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M772 600H790V600" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="48" y="728" width="1104" height="228" rx="14" fill="#141725" stroke="#34304e"/>
+<text x="68" y="759" class="label">ANDROID → PC</text>
+<rect x="68" y="780" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="88" y="808" class="label">SENDER · ANDROID</text>
+<text x="88" y="838" class="head">Select a file</text>
+<text x="88" y="868" class="body">Android hashes the source file</text>
+<text x="88" y="890" class="body">and sends an offer to the PC.</text>
+<rect x="434" y="780" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="454" y="808" class="label">RECEIVER · PC</text>
+<text x="454" y="838" class="head">Accept the offer</text>
+<text x="454" y="868" class="body">The PC asks for approval or</text>
+<text x="454" y="890" class="body">applies its auto-accept setting.</text>
+<rect x="800" y="780" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="820" y="808" class="label">ANDROID INITIATES</text>
+<text x="820" y="838" class="head">Upload the file</text>
+<text x="820" y="868" class="body">Android sends sequential chunks</text>
+<text x="820" y="890" class="body">to the PC over signed HTTPS.</text>
+<path d="M406 848H424V848" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M772 848H790V848" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="48" y="1008" class="label">03  /  FINISH SAFELY · BOTH DIRECTIONS</text>
+<text x="48" y="1036" class="sub">The sender keeps its original. Receiving bytes alone does not mean delivery.</text>
+<rect x="48" y="1058" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="68" y="1086" class="label">DURING TRANSFER</text>
+<text x="68" y="1116" class="head">Write a temporary file</text>
+<text x="68" y="1146" class="body">The receiver writes chunks into</text>
+<text x="68" y="1168" class="body">its configured receive folder.</text>
+<rect x="434" y="1058" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="454" y="1086" class="label">AFTER ALL BYTES ARRIVE</text>
+<text x="454" y="1116" class="head">Verify and finalize</text>
+<text x="454" y="1146" class="body">Check byte count and SHA-256.</text>
+<text x="454" y="1168" class="body">Finalize only after verification.</text>
+<rect x="820" y="1058" width="332" height="136" rx="14" fill="#151c29" stroke="#303c50"/>
+<text x="840" y="1086" class="label">AFTER SUCCESS</text>
+<text x="840" y="1116" class="head">Confirm delivery</text>
+<text x="840" y="1146" class="body">Exchange the verified receipt.</text>
+<text x="840" y="1168" class="body">Then mark the transfer delivered.</text>
+<path d="M388 1126H424V1126" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M774 1126H810V1126" fill="none" stroke="#8892a6" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="48" y="1234" class="small">Current implementation: 1 MiB chunks · Android foreground polling · No durable resume</text>
+<text x="48" y="1260" class="small">Rejected or failed transfers are not marked delivered. No cloud account is required.</text>
+</svg>
