@@ -64,3 +64,7 @@ Contributions are welcome. Open an issue to discuss substantial changes, then su
 ## Security
 
 Please report security vulnerabilities privately to the project maintainers rather than publishing exploit details in an issue. Do not include private keys or personal device data in reports.
+
+## License
+
+Ripple is licensed under the [GNU General Public License v3.0 only](LICENSE). Third-party components and assets may have their own license terms.

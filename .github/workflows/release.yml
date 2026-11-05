@@ -43,7 +43,9 @@ jobs:
           ./gradlew :app:assembleRelease
       - uses: softprops/action-gh-release@v2
         with:
-          files: Android/ripple/android/app/build/outputs/apk/release/*.apk
+          files: |
+            Android/ripple/android/app/build/outputs/apk/release/*.apk
+            LICENSE
   linux:
     needs: verify-release
     runs-on: ubuntu-latest
@@ -60,7 +62,7 @@ jobs:
         working-directory: Linux/ripple
         run: |
           make build
-          tar -czf ripple-linux-x86_64.tar.gz -C build/bin rippled ripple-desktop
+          tar -czf ripple-linux-x86_64.tar.gz -C build/bin rippled ripple-desktop -C ../../../.. LICENSE
       - uses: softprops/action-gh-release@v2
         with:
           files: Linux/ripple/ripple-linux-x86_64.tar.gz
