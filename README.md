@@ -2,7 +2,7 @@
 
 # ripple
 
-### Your devices, connected. Your files, yours.
+### Share files between your devices, simply and securely.
 
 Move files between your Android phone and Linux desktop over your local network.
 Pair once, stay in control, and keep the cloud out of the transfer.
