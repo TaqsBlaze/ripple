@@ -1,0 +1,47 @@
+# Dependencies and generated output
+**/node_modules/
+**/dist/
+**/build/
+**/.gradle/
+**/.idea/
+**/.cxx/
+**/android/
+!native/android-template/
+**/local.properties
+*.log
+*.tsbuildinfo
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+**/google-services.json
+**/secrets.properties
+**/.aws/
+**/.codex/
+**/.agents/
+
+# Compiled binaries and packages
+*.apk
+*.aab
+*.aar
+*.so
+*.o
+*.class
+*.exe
+*.dll
+*.dylib
+*.deb
+*.rpm
+*.AppImage
+Linux/ripple/rippled
+# Gradle's wrapper is needed to bootstrap builds
+*.jar
+!native/android-template/gradle/wrapper/gradle-wrapper.jar
+.DS_Store

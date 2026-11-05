@@ -1,0 +1,66 @@
+name: Build release artifacts
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  verify-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+      - name: Require release commit on main
+        run: git merge-base --is-ancestor HEAD origin/main
+  android:
+    needs: verify-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Android/ripple/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install, restore Android project, and build
+        working-directory: Android/ripple
+        run: |
+          npm ci
+          cp -a ../../native/android-template android
+          npm run build
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Android/ripple/android/app/build/outputs/apk/release/*.apk
+  linux:
+    needs: verify-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: Linux/ripple/go.mod
+      - name: Install Qt
+        run: sudo apt-get update && sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-tools-dev qt6-qmake libgl1-mesa-dev
+      - name: Build and package
+        working-directory: Linux/ripple
+        run: |
+          make build
+          tar -czf ripple-linux-x86_64.tar.gz -C build/bin rippled ripple-desktop
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Linux/ripple/ripple-linux-x86_64.tar.gz

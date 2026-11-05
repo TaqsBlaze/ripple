@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 1000" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="spectrum" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#00eaff"/><stop offset=".22" stop-color="#006dff"/>
+      <stop offset=".42" stop-color="#9a00ff"/><stop offset=".56" stop-color="#ff168c"/>
+      <stop offset=".7" stop-color="#ff7300"/><stop offset=".82" stop-color="#ffed00"/>
+      <stop offset="1" stop-color="#00e69b"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#fff" stop-opacity=".85"/><stop offset=".38" stop-color="#fff" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="edge"><rect width="360" height="1000" fill="url(#fade)"/></mask>
+  </defs>
+  <g fill="url(#spectrum)" mask="url(#edge)">
+    <path opacity=".36" d="M0 0H75C42 110 115 160 153 245S178 357 260 443 319 530 239 600 181 719 145 786 55 880 68 1000H0Z"/>
+    <path opacity=".36" d="M0 0H18C38 135 98 149 126 251S205 357 227 441 189 548 140 623 132 754 86 827 28 914 34 1000H0Z"/>
+    <path opacity=".46" d="M0 75C55 172 151 151 167 283S260 393 281 478 225 552 173 611 173 750 115 817 55 929 41 1000H0Z"/>
+  </g>
+  <g fill="none" stroke="url(#spectrum)" stroke-width="2" opacity=".8">
+    <path d="M0 100C53 172 146 154 167 283S259 393 281 478 225 552 173 611 173 750 115 817 55 929 41 1000"/>
+    <path opacity=".65" d="M0 225C66 268 143 304 174 369S241 436 252 492 185 574 142 635 139 752 85 821 28 914 34 1000"/>
+    <path opacity=".55" d="M0 347C75 390 127 390 180 451S223 529 169 584 111 691 104 760 42 850 0 887"/>
+  </g>
+</svg>

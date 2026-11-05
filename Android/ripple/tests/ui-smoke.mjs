@@ -1,0 +1,32 @@
+// Run against `npm run dev`; browser and Playwright module must be installed.
+import assert from 'node:assert/strict'
+const { chromium } = await import(process.env.RIPPLE_PLAYWRIGHT || 'playwright')
+const browser = await chromium.launch({ headless: true, executablePath: process.env.RIPPLE_CHROMIUM || undefined, args: ['--no-sandbox'] })
+const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 })
+const errors = []
+page.on('pageerror', error => errors.push(error.message))
+await page.goto(process.env.RIPPLE_URL || 'http://127.0.0.1:5173')
+await page.getByRole('heading', { name: 'Your devices' }).waitFor()
+assert.doesNotMatch(await page.locator('body').innerText(), /DESIGN PREVIEW|Proposal.pdf|Brand-assets.zip|SAMPLE RESPONSE/)
+await page.screenshot({ path: '/tmp/ripple-devices.png', fullPage: true })
+await page.getByRole('button', { name: 'Transfers', exact: true }).click()
+await page.getByRole('tab', { name: 'History', exact: true }).click()
+assert.equal(await page.getByRole('tab', { name: 'History', exact: true }).getAttribute('aria-selected'), 'true')
+await page.getByRole('tab', { name: 'Active', exact: true }).click()
+assert.equal(await page.getByRole('tab', { name: 'Active', exact: true }).getAttribute('aria-selected'), 'true')
+await page.screenshot({ path: '/tmp/ripple-transfers.png', fullPage: true })
+await page.getByRole('button', { name: 'Assistant', exact: true }).click()
+await page.screenshot({ path: '/tmp/ripple-assistant.png', fullPage: true })
+await page.getByRole('button', { name: 'Devices', exact: true }).click()
+await page.getByRole('button', { name: 'Settings', exact: true }).click()
+await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor()
+await page.screenshot({ path: '/tmp/ripple-settings.png', fullPage: true })
+for (const width of [320, 390, 768]) {
+  await page.setViewportSize({ width, height: 844 })
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow at ${width}`)
+}
+await page.emulateMedia({ reducedMotion: 'reduce' })
+assert.ok(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+assert.deepEqual(errors, [])
+await browser.close()
+console.log('PASS: real empty states, bottom navigation, Active/History tabs, responsive overflow and no browser errors')

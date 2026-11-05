@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ripple</string>
+    <string name="title_activity_main">Ripple</string>
+    <string name="package_name">com.openproject.ripple</string>
+    <string name="custom_url_scheme">com.openproject.ripple</string>
+</resources>
