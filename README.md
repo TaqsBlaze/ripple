@@ -12,7 +12,7 @@ Pair once, stay in control, and keep the cloud out of the transfer.
 ![Transport: local network](https://img.shields.io/badge/transport-local%20network-4C9AFF?style=for-the-badge)
 ![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--only-white?style=for-the-badge)
 
-[Explore features](#what-works-today) · [Get started](#get-started) · [Development board](#development-board) · [Design & workflow](#design--workflow) · [Contribute](#contributing)
+[Explore features](#what-works-today) · [Get started](#get-started) · [Development board](#development-board) · [Design & workflow](#design--workflow) · [Contribute](#contributing) · [Security](#-security--vulnerability-reporting)
 
 ![Ripple on desktop and Android](image/display.png)
 
@@ -144,7 +144,29 @@ Issues and focused pull requests are welcome. For a substantial change, open an 
 | Android | `npm run check`, `npm run lint`, `npm test`, `npm run build`, and relevant Gradle checks |
 | Linux | `make check`, the desktop build, and relevant integration checks |
 
-Do not commit credentials, signing keys, device data, or generated builds. Please report security vulnerabilities privately to the maintainers instead of posting exploit details publicly.
+Do not commit credentials, signing keys, device data, or generated builds. For security findings, follow the private-reporting guidance below.
+
+---
+
+## 🐛 Security & vulnerability reporting
+
+> [!CAUTION]
+> **Report security vulnerabilities privately to the project maintainers.**
+>
+> **Do not publish exploits, proof-of-concept code, reproduction steps, or sensitive findings in GitHub issues, pull requests, discussions, or other public channels.** Keep reports private while the maintainers investigate and coordinate a fix.
+
+### Report a vulnerability
+
+Contact the project maintainers through a private channel. If **Report a vulnerability** is available in the repository’s [Security tab](https://github.com/TaqsBlaze/ripple/security), use it to submit a private report. If it is unavailable, obtain a private reporting channel directly from the maintainers before sharing technical details.
+
+| Include in your private report | Keep out of the report |
+| :--- | :--- |
+| Affected version or commit, platform, and device details | Real credentials, private keys, or signing secrets |
+| A clear description of the vulnerability and its potential impact | Personal files or another person’s device data |
+| Minimal reproduction steps and a proof of concept, if needed | Unredacted logs containing sensitive information |
+| Relevant logs or screenshots with sensitive information removed | Unrelated private information |
+
+**Coordinate any public disclosure with the maintainers.** Allow time for investigation and remediation before sharing technical details publicly. Thank you for helping keep Ripple and its users safe.
 
 ---
 
