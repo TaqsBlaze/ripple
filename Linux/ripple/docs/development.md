@@ -10,7 +10,7 @@ IPC uses a four-byte big-endian length followed by UTF-8 JSON. Frames are limite
 
 The service provides TLS 1.3 QR enrollment, signed peer status, authenticated Android-to-PC transfers, desktop approval or a persisted auto-accept policy, and verified received-file storage. Linux publishes `_ripple._tcp` with protocol version and an opaque identifier derived from its pinned identity. Android can use that identifier to locate a previously trusted peer at a new address, then verifies the saved TLS pin and signed status before updating its endpoint. Discovery does not authorize a new peer; new devices still require QR approval.
 
-The desktop Transfers view exposes incoming offers, approval controls, progress, completed receipts, and opening completed files with the system's registered application. Linux-to-Android transfers are offered from a local file drop on the Ripple window right edge; Android polls the paired host, requires explicit acceptance, writes to the selected SAF folder, verifies the digest, and returns a receipt. Durable resume remains unavailable.
+The desktop Transfers view exposes incoming offers, approval controls, progress, completed receipts, and opening completed files with the system's registered application. Linux-to-Android transfers are offered by choosing a file or dropping it on the desktop send area; Android polls the paired host, supports explicit or trusted-device automatic acceptance, writes to the selected SAF folder, verifies the digest, and returns a receipt. Durable resume remains unavailable.
 
 ## Operational notes
 

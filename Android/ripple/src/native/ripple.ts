@@ -8,10 +8,10 @@ export interface BrowserEntry { id: string; name: string; kind: 'directory' | 'f
 export interface DirectoryListing { directoryId: string; parentId: string | null; rootId: string; entries: BrowserEntry[]; hasMore: boolean; nextOffset: number | null }
 export interface RipplePeer { id: string; name: string; connected: boolean }
 export interface DiscoveredDevice { id: string; name: string; host: string; port: number; version: string; paired?: boolean; peerId?: string }
-export interface RippleTransfer { id: string; name: string; direction: 'send' | 'receive'; state: 'offered' | 'accepted' | 'transferring' | 'verifying' | 'completed' | 'rejected' | 'paused' | 'failed' | 'cancelled'; size: number; offset: number; peerName: string }
+export interface RippleTransfer { id: string; name: string; direction: 'send' | 'receive'; state: 'offered' | 'accepted' | 'transferring' | 'verifying' | 'completed' | 'rejected' | 'paused' | 'failed' | 'cancelled'; size: number; offset: number; peerName: string; canOpen: boolean }
 export interface CancelTransferResult { remoteConfirmed: boolean; message?: string }
 export interface RippleSettings { haptics: boolean; appearance: 'dark' | 'system'; receiveFolder: string; autoAccept: boolean }
-export interface RippleState { files: RippleFile[]; peers: RipplePeer[]; discovered: DiscoveredDevice[]; transfers: RippleTransfer[]; settings: RippleSettings; discovering: boolean; discoveryError: string | null; identityFingerprint: string | null; native: boolean }
+export interface RippleState { files: RippleFile[]; peers: RipplePeer[]; discovered: DiscoveredDevice[]; transfers: RippleTransfer[]; settings: RippleSettings; discovering: boolean; discoveryError: string | null; identityFingerprint: string | null; desktopDropActive: boolean; native: boolean }
 interface NativeRipple {
   getBrowserRoots(): Promise<{ roots: BrowserRoot[] }>
   addBrowserRoot(): Promise<{ root: BrowserRoot | null }>
@@ -54,7 +54,7 @@ export const ripple = {
   async selectBrowserFile(fileId: string) { requireNative(); return (await plugin.selectBrowserFile({ fileId })).file },
   async onBack(callback: () => void) { if (!isNative) return () => {}; const handle = await plugin.addListener('backPressed', callback); return () => { void handle.remove() } },
   async exitApp() { requireNative(); return plugin.exitApp() },
-  async getState(): Promise<RippleState> { return isNative ? plugin.getState() : { files: [], peers: [], discovered: [], transfers: [], settings: webSettings, discovering: false, discoveryError: null, identityFingerprint: null, native: false } },
+  async getState(): Promise<RippleState> { return isNative ? plugin.getState() : { files: [], peers: [], discovered: [], transfers: [], settings: webSettings, discovering: false, discoveryError: null, identityFingerprint: null, desktopDropActive: false, native: false } },
   async subscribe(callback: () => void) { if (!isNative) return () => {}; const handle = await plugin.addListener('stateChanged', callback); return () => { void handle.remove() } },
   async listPeers() { return isNative ? (await plugin.listPeers()).peers : [] },
   async pickFiles() { requireNative(); return (await plugin.pickFiles()).files },

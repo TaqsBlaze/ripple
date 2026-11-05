@@ -35,7 +35,9 @@ The service uses `$XDG_RUNTIME_DIR/ripple/ripple.sock` for local IPC and `$XDG_D
 - The Qt shell shows the real service/device status and identity fingerprint.
 - QR enrollment uses TLS 1.3, explicit PC approval, and persisted peer keys.
 - The service advertises `_ripple._tcp` with only protocol version and an opaque identity-derived device ID. Android verifies the existing pin before updating a trusted PC's address.
-- Android-to-Linux and Linux-to-Android file transfers use signed HTTPS offers and bounded chunks. The desktop can require approval or auto-accept trusted Android uploads; Android explicitly accepts desktop offers and chooses a SAF receive folder. Completed received files open through the platform's registered file-type application.
+- Android-to-Linux and Linux-to-Android file transfers use signed HTTPS offers and bounded chunks. The desktop can require approval or auto-accept trusted Android uploads; Android accepts desktop offers manually or automatically from trusted PCs after choosing a SAF receive folder. Completed received files open through the platform's registered file-type application.
+- On the desktop, choose or drop one file to offer it to the single paired Android device. Open Ripple on Android and accept the offer; the desktop Transfers page shows its state. Sending is disabled if more than one device is paired.
+- Set the desktop receive folder in Settings; new incoming files use that folder and older files remain where they were received. Android has its own receive-folder setting.
 - Android can cancel an active outgoing transfer; the PC removes the partial file and records the cancellation.
 - Durable resume, AI, and packaging remain unavailable.
 

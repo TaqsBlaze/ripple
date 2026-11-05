@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import "components"
 
 ApplicationWindow {
@@ -15,7 +16,29 @@ ApplicationWindow {
     property bool sidebarCollapsed: false
     readonly property bool compact: sidebarCollapsed || width < 950
     readonly property int pageMargin: compact ? 24 : 48
-    property bool dropRippleActive: rippleService.dropActive || edgeDrop.containsDrag
+    property bool dropRippleActive: rippleService.dropActive || edgeDrop.containsDrag || dropArea.containsDrag
+    property bool desktopDropActive: edgeDrop.containsDrag || dropArea.containsDrag
+    onDesktopDropActiveChanged: rippleService.setDesktopDropActive(desktopDropActive)
+
+    readonly property bool canSend: rippleService.transferReady && rippleService.trustedPeers.length === 1
+    readonly property string targetId: canSend ? rippleService.trustedPeers[0].id : ""
+
+    function sendFile(url) {
+        if (canSend) rippleService.offerLocalFile(targetId, url)
+    }
+
+    FileDialog {
+        id: sendFileDialog
+        title: "Choose a file to send"
+        fileMode: FileDialog.OpenFile
+        onAccepted: window.sendFile(selectedFile)
+    }
+
+    FolderDialog {
+        id: receiveFolderDialog
+        title: "Choose where received files are saved"
+        onAccepted: rippleService.setReceiveDir(selectedFolder)
+    }
 
     property int page: 0
     readonly property color textPrimary: "#f5f5f5"
@@ -177,29 +200,37 @@ ApplicationWindow {
                         Text { text: "Send files"; color: window.textPrimary; font.pixelSize: 17; font.weight: Font.DemiBold; Layout.topMargin: 8 }
                         Panel {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 218
+                            implicitHeight: sendContent.implicitHeight + 48
                             border.color: dropArea.containsDrag ? "#ffffff" : "#343434"
                             border.width: dropArea.containsDrag ? 2 : 1
                             DropArea {
-                                id: dropArea; anchors.fill: parent
-                                enabled: rippleService.serviceOnline && androidTarget.currentValue !== undefined && androidTarget.currentValue !== ""
+                                id: dropArea
+                                anchors.fill: parent
+                                enabled: window.canSend
+                                onEntered: function(drag) { if (!drag.hasUrls || drag.urls.length !== 1) drag.accepted = false }
                                 onDropped: function(drop) {
-                                    if (!androidTarget.currentValue) return
-                                    for (let i = 0; i < drop.urls.length; ++i) {
-                                        const url = drop.urls[i]
-                                        if (url.isLocalFile) rippleService.offerLocalFile(androidTarget.currentValue, url.toLocalFile())
-                                    }
+                                    if (drop.hasUrls && drop.urls.length === 1) window.sendFile(drop.urls[0])
                                 }
                             }
                             ColumnLayout {
-                                anchors.centerIn: parent
-                                width: Math.min(430, parent.width - 48)
-                                spacing: 10
-                                Text { Layout.alignment: Qt.AlignHCenter; text: "⇧"; color: "white"; font.pixelSize: 31 }
-                                Text { Layout.alignment: Qt.AlignHCenter; text: "Drop files here"; color: window.textPrimary; font.pixelSize: 18; font.weight: Font.DemiBold }
-                                BodyText { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: rippleService.trustedPeers.length ? "Drop a file on the right edge to send it to your paired Android device. Accept it in Ripple on Android." : "Pair an Android device to send files." }
-                                ComboBox { id: androidTarget; Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: Math.min(300, parent.width); model: rippleService.trustedPeers; textRole: "name"; valueRole: "id"; visible: rippleService.trustedPeers.length > 0 }
-                                PrimaryButton { Layout.alignment: Qt.AlignHCenter; text: "Transfers"; enabled: rippleService.transferReady; onClicked: window.page = 1 }
+                                id: sendContent
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(0, Math.min(460, parent.width - 48))
+                                spacing: 12
+                                Text { Layout.alignment: Qt.AlignHCenter; text: "⇧"; color: "white"; font.pixelSize: 30 }
+                                Text { Layout.alignment: Qt.AlignHCenter; text: "Drop a file here"; color: window.textPrimary; font.pixelSize: 18; font.weight: Font.DemiBold }
+                                BodyText {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: !rippleService.serviceOnline ? "Start the Ripple service to send files." :
+                                          rippleService.trustedPeers.length === 0 ? "Pair an Android device to send files." :
+                                          rippleService.trustedPeers.length > 1 ? "Sending requires exactly one paired Android device." :
+                                          "Send to " + rippleService.trustedPeers[0].name + ". Check Ripple on Android to receive it."
+                                }
+                                PrimaryButton { Layout.alignment: Qt.AlignHCenter; text: "Choose file"; enabled: window.canSend; onClicked: sendFileDialog.open() }
+                                BodyText { visible: rippleService.sendMessage.length > 0; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: rippleService.sendMessage }
+                                Button { Layout.alignment: Qt.AlignHCenter; text: "View transfers"; onClicked: window.page = 1 }
                             }
                         }
 
@@ -340,6 +371,21 @@ ApplicationWindow {
                     }
                     Panel {
                         Layout.fillWidth: true
+                        implicitHeight: folderContent.implicitHeight + 44
+                        ColumnLayout {
+                            id: folderContent
+                            anchors.fill: parent
+                            anchors.margins: 22
+                            spacing: 8
+                            Text { text: "Receive folder"; color: window.textPrimary; font.pixelSize: 16; font.weight: Font.DemiBold }
+                            BodyText { Layout.fillWidth: true; text: "New files from Android will be saved here. Existing files stay in their original folder." }
+                            BodyText { Layout.fillWidth: true; text: rippleService.receiveDir || "Start the service to choose a folder."; wrapMode: Text.WrapAnywhere }
+                            Button { text: "Choose folder"; enabled: rippleService.transferReady; onClicked: receiveFolderDialog.open() }
+                            BodyText { Layout.fillWidth: true; visible: rippleService.folderMessage.length > 0; text: rippleService.folderMessage }
+                        }
+                    }
+                    Panel {
+                        Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(108, settingsRow.implicitHeight + 44)
                         RowLayout {
                             id: settingsRow
@@ -370,13 +416,10 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             anchors.right: parent.right
             width: 54
-            enabled: rippleService.serviceOnline && androidTarget.currentValue !== undefined && androidTarget.currentValue !== ""
+            enabled: window.canSend
+            onEntered: function(drag) { if (!drag.hasUrls || drag.urls.length !== 1) drag.accepted = false }
             onDropped: function(drop) {
-                if (!androidTarget.currentValue) return
-                for (let i = 0; i < drop.urls.length; ++i) {
-                    const url = drop.urls[i]
-                    if (url.isLocalFile) rippleService.offerLocalFile(androidTarget.currentValue, url.toLocalFile())
-                }
+                if (drop.hasUrls && drop.urls.length === 1) window.sendFile(drop.urls[0])
             }
             Rectangle {
                 anchors.fill: parent

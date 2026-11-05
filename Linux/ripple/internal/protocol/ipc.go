@@ -43,6 +43,7 @@ type ServiceStatus struct {
 	PendingPairs        any    `json:"pendingPairs"`
 	TrustedPeers        any    `json:"trustedPeers"`
 	Transfers           any    `json:"transfers"`
+	ReceiveDir          string `json:"receiveDir"`
 	AutoAccept          bool   `json:"autoAccept"`
 }
 

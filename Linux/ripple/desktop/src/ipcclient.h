@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QJsonArray>
+#include <QUrl>
 
 class IpcClient final : public QObject
 {
@@ -23,6 +24,9 @@ class IpcClient final : public QObject
     Q_PROPERTY(QJsonArray transfers READ transfers NOTIFY stateChanged)
     Q_PROPERTY(bool autoAccept READ autoAccept NOTIFY stateChanged)
     Q_PROPERTY(bool dropActive READ dropActive NOTIFY stateChanged)
+    Q_PROPERTY(QString receiveDir READ receiveDir NOTIFY stateChanged)
+    Q_PROPERTY(QString folderMessage READ folderMessage NOTIFY stateChanged)
+    Q_PROPERTY(QString sendMessage READ sendMessage NOTIFY stateChanged)
 
 public:
     explicit IpcClient(QObject *parent = nullptr);
@@ -41,16 +45,21 @@ public:
     QJsonArray transfers() const { return m_transfers; }
     bool autoAccept() const { return m_autoAccept; }
     bool dropActive() const { return m_dropActive; }
+    QString receiveDir() const { return m_receiveDir; }
+    QString folderMessage() const { return m_folderMessage; }
+    QString sendMessage() const { return m_sendMessage; }
 
     Q_INVOKABLE void refresh();
+    Q_INVOKABLE void setDesktopDropActive(bool active);
     Q_INVOKABLE void createInvitation();
     Q_INVOKABLE void decidePairing(const QString &id, bool approve);
     Q_INVOKABLE void decideTransfer(const QString &id, bool approve);
+    Q_INVOKABLE void setReceiveDir(const QUrl &url);
     Q_INVOKABLE void setAutoAccept(bool enabled);
     Q_INVOKABLE void setDeviceName(const QString &name);
     Q_INVOKABLE bool openReceivedFile(const QString &path);
     Q_INVOKABLE void deleteReceivedFile(const QString &id);
-    Q_INVOKABLE void offerLocalFile(const QString &peerId, const QString &path);
+    Q_INVOKABLE void offerLocalFile(const QString &peerId, const QUrl &url);
 
 signals:
     void stateChanged();
@@ -85,4 +94,8 @@ private:
     QJsonArray m_transfers;
     bool m_autoAccept = false;
     bool m_dropActive = false;
+    bool m_desktopDropActive = false;
+    QString m_sendMessage;
+    QString m_receiveDir;
+    QString m_folderMessage;
 };

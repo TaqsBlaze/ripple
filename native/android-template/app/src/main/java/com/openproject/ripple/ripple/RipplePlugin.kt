@@ -58,6 +58,7 @@ class RipplePlugin : Plugin() {
     private val activeReceiveTransfers = ConcurrentHashMap.newKeySet<String>()
     @Volatile private var monitorEnabled = true
     @Volatile private var monitorStarted = false
+    @Volatile private var desktopDropActive = false
     @Volatile private var listener: NsdManager.DiscoveryListener? = null
     @Volatile private var discoveryGeneration = 0
     @Volatile private var discovering = false
@@ -94,7 +95,7 @@ class RipplePlugin : Plugin() {
         }
         if (!monitorStarted) {
             monitorStarted = true
-            incomingMonitor.scheduleWithFixedDelay({ if (monitorEnabled) pollIncomingOffers() }, 2, 3, TimeUnit.SECONDS)
+            incomingMonitor.scheduleWithFixedDelay({ if (monitorEnabled) pollIncomingOffers() }, 1, 1, TimeUnit.SECONDS)
         }
     }
 
@@ -131,7 +132,7 @@ class RipplePlugin : Plugin() {
     } }
     private fun settings() = JSObject().apply {
         put("haptics", prefs.getBoolean("haptics", true)); put("appearance", prefs.getString("appearance", "dark"))
-        put("receiveFolder", prefs.getString("receiveFolderName", "Choose a folder")); put("autoAccept", false)
+        put("receiveFolder", prefs.getString("receiveFolderName", "Choose a folder")); put("autoAccept", prefs.getBoolean("autoAccept", false))
     }
     private fun ensureIdentity(): String {
         fingerprint?.let { return it }
@@ -156,7 +157,8 @@ class RipplePlugin : Plugin() {
     } }
     private fun transferViews() = JSArray().apply { transferRecords.values.sortedByDescending { it.optLong("createdAt", it.optLong("updatedAt")) }.forEach { item ->
         put(JSObject().put("id",item.optString("id")).put("name",item.optString("name")).put("direction",item.optString("direction"))
-            .put("state",item.optString("state")).put("size",item.optLong("size")).put("offset",item.optLong("offset")).put("peerName",item.optString("peerName")))
+            .put("state",item.optString("state")).put("size",item.optLong("size")).put("offset",item.optLong("offset")).put("peerName",item.optString("peerName"))
+            .put("canOpen", (item.optString("direction") == "receive" && receivedFileFor(item.optString("id")) != null) || (item.optString("direction") == "send" && item.optString("sourceUri").isNotEmpty())))
     } }
     private fun saveTransfers() { val array=JSONArray();transferRecords.values.forEach { array.put(it) };check(prefs.edit().putString("transfers",array.toString()).commit()) }
 
@@ -173,6 +175,8 @@ class RipplePlugin : Plugin() {
                     peer.put("name", updatedName); savePeers(); changed()
                 }
                 val response = client.json("GET", "/v1/transfers/inbox")
+                val remoteDrop = response.optBoolean("desktopDropActive", false)
+                if (desktopDropActive != remoteDrop) { desktopDropActive = remoteDrop; changed() }
                 val offers = response.optJSONArray("transfers") ?: JSONArray()
                 for (index in 0 until offers.length()) {
                     val remote = offers.optJSONObject(index) ?: continue
@@ -192,8 +196,10 @@ class RipplePlugin : Plugin() {
                         item.put("state", state); item.put("offset", offset); item.put("updatedAt", System.currentTimeMillis())
                         transferRecords[id] = item; dirty = true
                     }
+                    if (state == "offered" && prefs.getBoolean("autoAccept", false)) startReceive(id, null)
                 }
             } catch (error: Exception) {
+                if (desktopDropActive) { desktopDropActive = false; changed() }
                 android.util.Log.d("RipplePlugin", "Could not refresh incoming transfers from ${peer.optString("name")}", error)
             }
         }
@@ -321,7 +327,7 @@ class RipplePlugin : Plugin() {
             receivedFiles().forEach { files.put(publicFile(it)) }
             put("files", files); put("peers", peerViews()); put("discovered", devices); put("transfers", transferViews())
             put("settings", settings()); put("discovering", discovering); put("discoveryError", discoveryError ?: JSONObject.NULL)
-            put("identityFingerprint", ensureIdentity()); put("native", true)
+            put("identityFingerprint", ensureIdentity()); put("desktopDropActive", desktopDropActive); put("native", true)
         })
     }
     @PluginMethod fun pickFiles(call: PluginCall) {
@@ -372,14 +378,21 @@ class RipplePlugin : Plugin() {
     }
     private fun fileFor(call: PluginCall): JSONObject {
         val id = call.getString("fileId") ?: throw IllegalArgumentException("Choose a file first.")
-        return selected[id] ?: receivedFileFor(id) ?: throw IllegalArgumentException("This file is no longer available.")
+        return selected[id] ?: receivedFileFor(id) ?: transferRecords[id]?.takeIf { it.optString("direction") == "send" && it.optString("sourceUri").isNotEmpty() }?.let { item ->
+            JSONObject().put("uri", item.getString("sourceUri")).put("name", item.optString("name")).put("mimeType", item.optString("mimeType", "application/octet-stream"))
+        } ?: throw IllegalArgumentException("This file is no longer available. Select it again.")
     }
     private fun receivedFiles(): List<JSONObject> = transferRecords.keys.mapNotNull(::receivedFileFor).sortedBy { it.optString("name") }
     private fun launchFile(call: PluginCall, share: Boolean) = task(call) {
         val file = fileFor(call); val uri = Uri.parse(file.getString("uri"))
         context.contentResolver.openFileDescriptor(uri, "r")?.use { } ?: throw IllegalArgumentException("This file is unavailable. Choose it again.")
+        val declaredType = file.optString("mimeType", "application/octet-stream").substringBefore(';').trim().lowercase()
+        val providerType = context.contentResolver.getType(uri)?.substringBefore(';')?.trim()?.lowercase()
+        val extension = file.optString("name").substringAfterLast('.', "").lowercase()
+        val extensionType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        val mime = listOf(declaredType, providerType, extensionType).firstOrNull { !it.isNullOrBlank() && it != "application/octet-stream" && it != "*/*" } ?: "application/octet-stream"
         val intent = Intent(if (share) Intent.ACTION_SEND else Intent.ACTION_VIEW).apply {
-            if (share) { type = file.getString("mimeType"); putExtra(Intent.EXTRA_STREAM, uri) } else setDataAndType(uri, file.getString("mimeType"))
+            if (share) { type = mime; putExtra(Intent.EXTRA_STREAM, uri) } else setDataAndType(uri, mime)
             clipData = ClipData.newRawUri("Ripple file", uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         activity.runOnUiThread {
@@ -399,7 +412,11 @@ class RipplePlugin : Plugin() {
             }
         } else {
             val received = receivedFileFor(id) ?: throw IllegalArgumentException("This received file is no longer available.")
-            val tree = Uri.parse(prefs.getString("receiveFolderUri", null) ?: throw IllegalArgumentException("Choose a receive folder before deleting received files."))
+            val storedTree = transferRecords[id]?.optString("receiveTreeUri")?.takeIf { it.isNotEmpty() }
+            val fileUri = received.getString("uri")
+            val treeUri = storedTree ?: context.contentResolver.persistedUriPermissions.firstOrNull { fileUri.startsWith(it.uri.toString() + "/") && it.isWritePermission }?.uri?.toString()
+                ?: prefs.getString("receiveFolderUri", null) ?: throw IllegalArgumentException("The receive folder is no longer available.")
+            val tree = Uri.parse(treeUri)
             require(context.contentResolver.persistedUriPermissions.any { it.uri == tree && it.isWritePermission }) { "Ripple no longer has write access to the receive folder." }
             val uri = Uri.parse(received.getString("uri"))
             require(uri.scheme == "content" && DocumentsContract.deleteDocument(context.contentResolver, uri)) { "The Android document provider could not delete this received file." }
@@ -429,15 +446,19 @@ class RipplePlugin : Plugin() {
             var name = "Selected folder"
             val document = DocumentsContract.buildDocumentUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri))
             context.contentResolver.query(document, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) name = cursor.getString(0).take(255) }
-            val previous = prefs.getString("receiveFolderUri", null)
             check(prefs.edit().putString("receiveFolderUri", uri.toString()).putString("receiveFolderName", name).commit())
-            if (previous != null && previous != uri.toString() && browserRoots.values.none { it.optString("uri") == previous }) runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(previous), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
             changed(); call.resolve()
         }
     }
     @PluginMethod fun updateSettings(call: PluginCall) = task(call) {
-        require(call.getBoolean("autoAccept", false) != true) { "Pair a trusted device before enabling automatic acceptance." }
+        val autoAccept = call.getBoolean("autoAccept")
+        if (autoAccept == true) {
+            require(trustedPeers.isNotEmpty()) { "Pair a trusted device before enabling automatic acceptance." }
+            val tree = Uri.parse(prefs.getString("receiveFolderUri", null) ?: throw IllegalArgumentException("Choose a receive folder before enabling automatic acceptance."))
+            require(context.contentResolver.persistedUriPermissions.any { it.uri == tree && it.isReadPermission && it.isWritePermission }) { "Choose a receive folder with read and write access before enabling automatic acceptance." }
+        }
         val edit = prefs.edit()
+        autoAccept?.let { edit.putBoolean("autoAccept", it) }
         call.getBoolean("haptics")?.let { edit.putBoolean("haptics", it) }
         call.getString("appearance")?.let { require(it == "dark" || it == "system") { "Unsupported appearance." }; edit.putString("appearance", it) }
         check(edit.commit()); changed(); call.resolve()
@@ -630,7 +651,7 @@ class RipplePlugin : Plugin() {
         val uri=Uri.parse(file.getString("uri"));val digest=MessageDigest.getInstance("SHA-256");var size=0L
         context.contentResolver.openInputStream(uri)?.use { input -> val buffer=ByteArray(1024*1024);while(true){val count=input.read(buffer);if(count<0)break;digest.update(buffer,0,count);size+=count} } ?: throw IllegalArgumentException("This file is unavailable. Select it again.")
         val sha256=digest.digest().joinToString("") { "%02x".format(it) };val id=UUID.randomUUID().toString()
-        val record=JSONObject().apply { put("id",id);put("peerId",peerId);put("name",file.getString("name"));put("direction","send");put("state","offered");put("size",size);put("offset",0);put("peerName",peer.optString("name"));put("createdAt",System.currentTimeMillis());put("updatedAt",System.currentTimeMillis());put("sha256",sha256) }
+        val record=JSONObject().apply { put("id",id);put("peerId",peerId);put("name",file.getString("name"));put("direction","send");put("state","offered");put("size",size);put("offset",0);put("peerName",peer.optString("name"));put("createdAt",System.currentTimeMillis());put("updatedAt",System.currentTimeMillis());put("sha256",sha256);put("sourceUri",uri.toString());put("mimeType",file.optString("mimeType","application/octet-stream")) }
         transferRecords[id]=record;activeSendTransfers.add(id);saveTransfers();changed()
         try {
         client.json("POST","/v1/transfers",JSONObject().apply { put("version",1);put("transferId",id);put("name",file.getString("name"));put("size",size);put("mimeType",file.optString("mimeType","application/octet-stream"));put("sha256",sha256) })
@@ -668,8 +689,7 @@ class RipplePlugin : Plugin() {
             activeSendTransfers.remove(id)
         }
     }
-    private fun receiveFile(call: PluginCall) {
-        val id = call.getString("transferId") ?: throw IllegalArgumentException("Transfer ID is required.")
+    private fun receiveFile(id: String, call: PluginCall?) {
         val item = transferRecords[id] ?: throw IllegalArgumentException("Transfer not found.")
         require(item.optString("direction") == "receive" && item.optString("state") == "offered") { "This file is no longer waiting for approval." }
         val peer = trustedPeers[item.optString("peerId")] ?: throw IllegalArgumentException("This PC is no longer trusted. Pair it again before receiving files.")
@@ -681,11 +701,11 @@ class RipplePlugin : Plugin() {
         val size = item.optLong("size", -1L)
         val expectedHash = item.optString("sha256")
         require(size in 0..(10L shl 30) && expectedHash.matches(Regex("[0-9a-f]{64}"))) { "The PC sent invalid file details." }
+        item.put("receiveTreeUri", tree.toString())
         val rootDocument = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val temporaryName = ".ripple-$id.part"
         var temporaryUri: Uri? = null
         var finalizedUri: Uri? = null
-        activeReceiveTransfers.add(id)
         try {
             val decision = client.json("POST", "/v1/transfers/$id/decision", JSONObject().put("approve", true))
             require(decision.optString("state") == "accepted") { "The PC did not accept this transfer." }
@@ -718,12 +738,12 @@ class RipplePlugin : Plugin() {
             val receipt = client.json("POST", "/v1/transfers/$id/receipt", JSONObject().put("size", size).put("sha256", actualHash))
             require(receipt.optString("state") == "completed" && receipt.optString("sha256") == expectedHash) { "The PC did not confirm the verified receipt." }
             item.put("state", "completed"); item.put("receiptId", receipt.optString("receiptId")); item.put("updatedAt", System.currentTimeMillis())
-            saveTransfers(); changed(); call.resolve()
+            saveTransfers(); changed(); call?.resolve()
         } catch (error: Exception) {
             if (cancellationRequests.contains(id)) {
                 runCatching { client.json("POST", "/v1/transfers/$id/cancel", JSONObject()) }
                 temporaryUri?.let { runCatching { DocumentsContract.deleteDocument(context.contentResolver, it) } }
-                item.put("state", "cancelled"); item.put("updatedAt", System.currentTimeMillis()); saveTransfers(); changed(); call.resolve()
+                item.put("state", "cancelled"); item.put("updatedAt", System.currentTimeMillis()); saveTransfers(); changed(); call?.resolve()
             } else {
                 if (finalizedUri == null) {
                     runCatching { client.json("POST", "/v1/transfers/$id/cancel", JSONObject()) }
@@ -732,10 +752,10 @@ class RipplePlugin : Plugin() {
                 if (finalizedUri == null) item.remove("uri")
                 item.put("state", if (finalizedUri == null) "failed" else "verifying")
                 item.put("updatedAt", System.currentTimeMillis()); saveTransfers(); changed()
-                call.reject(error.message ?: "The file could not be received.", "TRANSFER_FAILED")
+                call?.reject(error.message ?: "The file could not be received.", "TRANSFER_FAILED")
             }
         } finally {
-            cancellationRequests.remove(id); activeReceiveTransfers.remove(id)
+            cancellationRequests.remove(id)
         }
     }
 
@@ -758,13 +778,26 @@ class RipplePlugin : Plugin() {
         throw IllegalArgumentException("The receive folder already contains too many files named '$base'.")
     }
 
-    @PluginMethod fun acceptTransfer(call: PluginCall) {
+    private fun startReceive(id: String, call: PluginCall?) {
+        if (!activeReceiveTransfers.add(id)) { call?.reject("This transfer is already being received.", "BUSY"); return }
         transferWorker.execute {
-            try { receiveFile(call) }
-            catch (error: IllegalArgumentException) { call.reject(error.message ?: "Invalid transfer.", "INVALID_REQUEST") }
-            catch (error: SecurityException) { call.reject("Android denied access to the receive folder. Choose it again in Settings.", "ACCESS_DENIED") }
-            catch (error: Exception) { android.util.Log.e("RipplePlugin", "Incoming transfer failed", error); call.reject(error.message ?: "The file could not be received.", "TRANSFER_FAILED") }
+            try { receiveFile(id, call) }
+            catch (error: Exception) {
+                android.util.Log.e("RipplePlugin", "Incoming transfer failed", error)
+                if (call != null) call.reject(error.message ?: "The file could not be received.", "TRANSFER_FAILED")
+                else {
+                    transferRecords[id]?.let { item ->
+                        item.put("state", "failed"); item.put("updatedAt", System.currentTimeMillis())
+                        runCatching { saveTransfers() }; changed()
+                    }
+                }
+            } finally { activeReceiveTransfers.remove(id) }
         }
+    }
+    @PluginMethod fun acceptTransfer(call: PluginCall) {
+        val id = call.getString("transferId")
+        if (id == null) { call.reject("Transfer ID is required.", "INVALID_REQUEST"); return }
+        startReceive(id, call)
     }
     @PluginMethod fun rejectTransfer(call: PluginCall) = task(call) {
         val id = call.getString("transferId") ?: throw IllegalArgumentException("Transfer ID is required.")
@@ -812,7 +845,7 @@ class RipplePlugin : Plugin() {
     @PluginMethod fun submitAiRequest(call: PluginCall) { hostUnavailable(call) }
     @PluginMethod fun approveAiAction(call: PluginCall) { hostUnavailable(call) }
     @PluginMethod fun cancelAiRequest(call: PluginCall) { call.reject("AI request not found.", "UNKNOWN_REQUEST") }
-    override fun handleOnPause() { monitorEnabled = false; stop() }
+    override fun handleOnPause() { monitorEnabled = false; desktopDropActive = false; changed(); stop() }
     override fun handleOnResume() { monitorEnabled = true; transferWorker.execute { pollIncomingOffers() }; if (trustedPeers.isNotEmpty()) activity.runOnUiThread { startDiscoveryInternal(null) } }
     override fun handleOnDestroy() { monitorEnabled = false; stop(); incomingMonitor.shutdownNow(); worker.shutdown(); transferWorker.shutdownNow(); dropWorker.shutdownNow() }
 }

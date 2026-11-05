@@ -54,10 +54,19 @@ IpcClient::IpcClient(QObject *parent)
         if (m_socket.state() != QLocalSocket::ConnectedState) return;
         const QJsonObject request{{QStringLiteral("version"), 1}, {QStringLiteral("type"), QStringLiteral("drop.status")}, {QStringLiteral("requestId"), QUuid::createUuid().toString(QUuid::WithoutBraces)}};
         m_socket.write(prefixFrame(QJsonDocument(request).toJson(QJsonDocument::Compact)));
+        if (m_desktopDropActive) setDesktopDropActive(true);
     });
     m_invitationExpiry.setSingleShot(true);
     connect(&m_invitationExpiry,&QTimer::timeout,this,[this]{m_invitation.clear();m_invitationQr.clear();emit stateChanged();});
     QTimer::singleShot(0, this, &IpcClient::refresh);
+}
+
+void IpcClient::setDesktopDropActive(bool active)
+{
+    m_desktopDropActive = active;
+    if (m_socket.state() != QLocalSocket::ConnectedState) return;
+    const QJsonObject request{{QStringLiteral("version"), 1}, {QStringLiteral("type"), QStringLiteral("drop.desktop")}, {QStringLiteral("requestId"), QUuid::createUuid().toString(QUuid::WithoutBraces)}, {QStringLiteral("payload"), QJsonObject{{QStringLiteral("active"), active}}}};
+    m_socket.write(prefixFrame(QJsonDocument(request).toJson(QJsonDocument::Compact)));
 }
 
 void IpcClient::refresh()
@@ -125,6 +134,14 @@ void IpcClient::setDeviceName(const QString &name)
     m_socket.write(prefixFrame(QJsonDocument(request).toJson(QJsonDocument::Compact)));
 }
 
+void IpcClient::setReceiveDir(const QUrl &url)
+{
+    if (!url.isLocalFile()) { m_folderMessage = QStringLiteral("Choose a local folder."); emit stateChanged(); return; }
+    m_folderMessage.clear();
+    const QJsonObject request{{QStringLiteral("version"),1},{QStringLiteral("type"),QStringLiteral("transfer.receive_dir")},{QStringLiteral("requestId"),QUuid::createUuid().toString(QUuid::WithoutBraces)},{QStringLiteral("payload"),QJsonObject{{QStringLiteral("path"),url.toLocalFile()}}}};
+    m_socket.write(prefixFrame(QJsonDocument(request).toJson(QJsonDocument::Compact)));
+}
+
 void IpcClient::setAutoAccept(bool enabled)
 {
     const QJsonObject request{{QStringLiteral("version"),1},{QStringLiteral("type"),QStringLiteral("transfer.auto_accept")},{QStringLiteral("requestId"),QUuid::createUuid().toString(QUuid::WithoutBraces)},{QStringLiteral("payload"),QJsonObject{{QStringLiteral("enabled"),enabled}}}};
@@ -148,8 +165,16 @@ void IpcClient::deleteReceivedFile(const QString &id)
     m_socket.write(prefixFrame(QJsonDocument(request).toJson(QJsonDocument::Compact)));
 }
 
-void IpcClient::offerLocalFile(const QString &peerId, const QString &path)
+void IpcClient::offerLocalFile(const QString &peerId, const QUrl &url)
 {
+    if (!url.isLocalFile() || url.toLocalFile().isEmpty()) {
+        m_sendMessage = QStringLiteral("Choose a local file to send.");
+        emit stateChanged();
+        return;
+    }
+    const QString path = url.toLocalFile();
+    m_sendMessage = QStringLiteral("Preparing %1…").arg(QFileInfo(path).fileName());
+    emit stateChanged();
     const QJsonObject request{{QStringLiteral("version"), 1}, {QStringLiteral("type"), QStringLiteral("transfer.offer_local")}, {QStringLiteral("requestId"), QUuid::createUuid().toString(QUuid::WithoutBraces)}, {QStringLiteral("payload"), QJsonObject{{QStringLiteral("peerId"), peerId}, {QStringLiteral("path"), path}}}};
     m_socket.write(prefixFrame(QJsonDocument(request).toJson(QJsonDocument::Compact)));
 }
@@ -184,6 +209,9 @@ void IpcClient::handleFrame(const QByteArray &frame)
     }
     if (response.contains(QStringLiteral("error"))) {
         m_statusMessage = response.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString();
+        if (response.value(QStringLiteral("type")).toString() == QStringLiteral("transfer.receive_dir.result")) m_folderMessage = m_statusMessage;
+        if (response.value(QStringLiteral("type")).toString() == QStringLiteral("transfer.offer_local.result"))
+            m_sendMessage = m_statusMessage;
         emit stateChanged();
         return;
     }
@@ -196,6 +224,10 @@ void IpcClient::handleFrame(const QByteArray &frame)
         return;
     }
     const QString responseType = response.value(QStringLiteral("type")).toString();
+    if (responseType == QStringLiteral("transfer.offer_local.result"))
+        m_sendMessage = QStringLiteral("%1 is ready. Check Ripple on Android.").arg(payload.value(QStringLiteral("name")).toString());
+    if (responseType == QStringLiteral("transfer.receive_dir.result")) { m_folderMessage = QStringLiteral("Receive folder updated."); emit stateChanged(); QTimer::singleShot(0, this, &IpcClient::refresh); return; }
+    if (responseType == QStringLiteral("drop.desktop.result")) return;
     if (responseType == QStringLiteral("drop.status.result")) {
         const bool active = payload.value(QStringLiteral("active")).toBool();
         if (m_dropActive != active) { m_dropActive = active; emit stateChanged(); }
@@ -214,6 +246,7 @@ void IpcClient::handleFrame(const QByteArray &frame)
     m_pendingPairs = payload.value(QStringLiteral("pendingPairs")).toArray();
     m_trustedPeers = payload.value(QStringLiteral("trustedPeers")).toArray();
     m_transfers = payload.value(QStringLiteral("transfers")).toArray();
+    m_receiveDir = payload.value(QStringLiteral("receiveDir")).toString();
     m_autoAccept = payload.value(QStringLiteral("autoAccept")).toBool();
     m_serviceOnline = true;
     m_statusMessage = m_pairingReady

@@ -7,8 +7,9 @@ import (
 
 // DropState carries short-lived, authenticated Android drag-hover feedback to the desktop UI.
 type DropState struct {
-	mu    sync.Mutex
-	peers map[string]time.Time
+	mu           sync.Mutex
+	peers        map[string]time.Time
+	desktopUntil time.Time
 }
 
 func NewDropState() *DropState { return &DropState{peers: make(map[string]time.Time)} }
@@ -36,4 +37,20 @@ func (s *DropState) Active() bool {
 		}
 	}
 	return active
+}
+
+// SetDesktop tracks the desktop drag independently of Android hover feedback.
+func (s *DropState) SetDesktop(active bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if active {
+		s.desktopUntil = time.Now().Add(2 * time.Second)
+	}
+	// Keep a short pulse after release so a foreground Android poll can observe it.
+}
+
+func (s *DropState) DesktopActive() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return time.Now().Before(s.desktopUntil)
 }

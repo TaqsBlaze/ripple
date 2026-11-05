@@ -17,8 +17,9 @@ const listeners = new Map()
 const fixtureFile = { id: 'selected-fixture', name: 'Fixture.txt', size: 32, mimeType: 'text/plain', source: 'selected', persisted: true }
 const fixtureState = { files: [], peers: [], discovered: [], transfers: [], settings: { haptics: false, appearance: 'dark', receiveFolder: 'Choose a folder', autoAccept: false }, native: true, discovering: false, discoveryError: null, identityFingerprint: null }
 if (nativeFixture) {
+  fixtureState.transfers = [{ id: 'received-fixture', name: 'Photo.png', direction: 'receive', state: 'completed', size: 10, offset: 10, peerName: 'PC', canOpen: true }]
   window.androidBridge = {}
-  const methods = ['getState', 'getBrowserRoots', 'listDirectory', 'selectBrowserFile', 'updateSettings', 'removeFile', 'exitApp']
+  const methods = ['getState', 'getBrowserRoots', 'listDirectory', 'selectBrowserFile', 'updateSettings', 'removeFile', 'openFile', 'exitApp']
   window.Capacitor = {
     PluginHeaders: [{ name: 'Ripple', methods: [...methods.map(name => ({ name, rtype: 'promise' })), { name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'promise' }] }],
     nativeCallback(_plugin, method, options, callback) { if (method === 'addListener') listeners.set(options.eventName, callback); return 'listener' },
@@ -33,12 +34,13 @@ if (nativeFixture) {
       }
       if (method === 'selectBrowserFile') { assert.equal(options.fileId, 'file-fixture'); fixtureState.files = [fixtureFile]; listeners.get('stateChanged')?.(); return { file: fixtureFile } }
       if (method === 'updateSettings') { Object.assign(fixtureState.settings, options); listeners.get('stateChanged')?.(); return }
-      if (method === 'removeListener' || method === 'exitApp') return
+      if (method === 'openFile' || method === 'removeListener' || method === 'exitApp') return
       throw new Error(`Unexpected native call: ${method}`)
     },
   }
 }
 window.matchMedia = query => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })
+window.HTMLMediaElement.prototype.play = async () => {}
 window.scrollTo = () => {}
 window.HTMLElement.prototype.scrollTo = () => {}
 window.requestAnimationFrame = cb => window.setTimeout(() => cb(performance.now()), 0)
@@ -70,6 +72,7 @@ assert.match(pageText(), /transfer/i)
 await click('History')
 const history = queryButton('History')
 assert.equal(history.getAttribute('aria-selected'), 'true')
+if (nativeFixture) { await click('Open Photo.png'); assert.ok(nativeCalls.some(call => call.method === 'openFile' && call.options.fileId === 'received-fixture')) }
 await click('Active')
 assert.equal(queryButton('Active').getAttribute('aria-selected'), 'true')
 await click('Assistant')

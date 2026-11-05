@@ -34,6 +34,7 @@ type Item struct {
 	State           string `json:"state"`
 	Direction       string `json:"direction,omitempty"`
 	SourcePath      string `json:"sourcePath,omitempty"`
+	ReceiveDir      string `json:"receiveDir,omitempty"`
 	SourceModTime   int64  `json:"sourceModTime,omitempty"`
 	ReceiptID       string `json:"receiptId,omitempty"`
 	Deleted         bool   `json:"deleted,omitempty"`
@@ -45,13 +46,14 @@ type Manager struct {
 	root       string
 	items      map[string]*Item
 	autoAccept bool
+	receiveDir string
 }
 
 func New(root string) (*Manager, error) {
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
-	m := &Manager{root: root, items: map[string]*Item{}}
+	m := &Manager{root: root, receiveDir: root, items: map[string]*Item{}}
 	data, err := os.ReadFile(filepath.Join(root, "transfers.json"))
 	if err == nil {
 		var items []*Item
@@ -66,9 +68,6 @@ func New(root string) (*Manager, error) {
 				item.CreatedAt = item.UpdatedAt
 			}
 			m.items[item.ID] = item
-			if item.Deleted {
-				_ = os.Remove(filepath.Join(root, item.Name))
-			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -76,12 +75,16 @@ func New(root string) (*Manager, error) {
 	policy, err := os.ReadFile(filepath.Join(root, "receive-policy.json"))
 	if err == nil {
 		var value struct {
-			AutoAccept bool `json:"autoAccept"`
+			AutoAccept bool   `json:"autoAccept"`
+			ReceiveDir string `json:"receiveDir"`
 		}
 		if err := json.Unmarshal(policy, &value); err != nil {
 			return nil, err
 		}
 		m.autoAccept = value.AutoAccept
+		if value.ReceiveDir != "" {
+			m.receiveDir = value.ReceiveDir
+		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -94,12 +97,17 @@ func (m *Manager) AutoAccept() bool {
 	return m.autoAccept
 }
 
-func (m *Manager) SetAutoAccept(enabled bool) error {
+func (m *Manager) ReceiveDir() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.receiveDir
+}
+
+func (m *Manager) savePolicy(autoAccept bool, receiveDir string) error {
 	data, err := json.Marshal(struct {
-		AutoAccept bool `json:"autoAccept"`
-	}{enabled})
+		AutoAccept bool   `json:"autoAccept"`
+		ReceiveDir string `json:"receiveDir"`
+	}{autoAccept, receiveDir})
 	if err != nil {
 		return err
 	}
@@ -112,8 +120,58 @@ func (m *Manager) SetAutoAccept(enabled bool) error {
 		_ = os.Remove(tmp)
 		return err
 	}
+	return nil
+}
+func (m *Manager) SetAutoAccept(enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.savePolicy(enabled, m.receiveDir); err != nil {
+		return err
+	}
 	m.autoAccept = enabled
 	return nil
+}
+func (m *Manager) SetReceiveDir(path string) error {
+	if !filepath.IsAbs(path) {
+		return errors.New("choose an absolute folder path")
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return errors.New("choose a folder")
+	}
+	probe, err := os.CreateTemp(resolved, ".ripple-write-check-*")
+	if err != nil {
+		return fmt.Errorf("folder is not writable: %w", err)
+	}
+	probeName := probe.Name()
+	closeErr := probe.Close()
+	removeErr := os.Remove(probeName)
+	if closeErr != nil {
+		return closeErr
+	}
+	if removeErr != nil {
+		return removeErr
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.savePolicy(m.autoAccept, resolved); err != nil {
+		return err
+	}
+	m.receiveDir = resolved
+	return nil
+}
+func (m *Manager) itemDir(item *Item) string {
+	if item.ReceiveDir != "" {
+		return item.ReceiveDir
+	}
+	return m.root
 }
 
 func (m *Manager) FilePath(id string) (string, error) {
@@ -123,7 +181,7 @@ func (m *Manager) FilePath(id string) (string, error) {
 	if item == nil || item.Direction != "receive" || item.State != "completed" || item.Deleted {
 		return "", errors.New("received file is not complete")
 	}
-	return filepath.Join(m.root, item.Name), nil
+	return filepath.Join(m.itemDir(item), item.Name), nil
 }
 
 func (m *Manager) DeleteCompleted(id string) error {
@@ -142,7 +200,7 @@ func (m *Manager) DeleteCompleted(id string) error {
 		item.Deleted = false
 		return err
 	}
-	if err := os.Remove(filepath.Join(m.root, item.Name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := os.Remove(filepath.Join(m.itemDir(item), item.Name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		item.Deleted = false
 		_ = m.persist()
 		return err
@@ -394,6 +452,7 @@ func (m *Manager) Decide(id string, approve bool) error {
 		return errors.New("transfer is no longer awaiting approval")
 	}
 	if approve {
+		item.ReceiveDir = m.receiveDir
 		item.State = "accepted"
 	} else {
 		item.State = "rejected"
@@ -429,7 +488,7 @@ func (m *Manager) Append(id, peerID string, offset int64, body []byte) (Item, er
 	if offset != item.Offset || offset+int64(len(body)) > item.Size {
 		return Item{}, errors.New("chunk offset or length is invalid")
 	}
-	file, err := os.OpenFile(filepath.Join(m.root, item.ID+".part"), os.O_CREATE|os.O_WRONLY, 0o600)
+	file, err := os.OpenFile(filepath.Join(m.itemDir(item), item.ID+".part"), os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return Item{}, err
 	}
@@ -467,7 +526,7 @@ func (m *Manager) Complete(id, peerID string, size int64, digest string) (Item, 
 	if item.Offset != size || size != item.Size || digest != item.SHA256 {
 		return Item{}, errors.New("completion metadata does not match offer")
 	}
-	filePath := filepath.Join(m.root, id+".part")
+	filePath := filepath.Join(m.itemDir(item), id+".part")
 	if size == 0 {
 		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0o600)
 		if err != nil {
@@ -501,11 +560,15 @@ func (m *Manager) Complete(id, peerID string, size int64, digest string) (Item, 
 		_ = m.persist()
 		return Item{}, errors.New("received file failed length or SHA-256 verification")
 	}
-	dest, err := m.safeDestination(item.Name)
+	dest, err := m.safeDestination(m.itemDir(item), item.Name)
 	if err != nil {
 		return Item{}, err
 	}
-	if err = os.Rename(filePath, dest); err != nil {
+	if err = os.Link(filePath, dest); err != nil {
+		return Item{}, err
+	}
+	if err = os.Remove(filePath); err != nil {
+		_ = os.Remove(dest)
 		return Item{}, err
 	}
 	item.Name = filepath.Base(dest)
@@ -529,7 +592,7 @@ func (m *Manager) Cancel(id, peerID string) error {
 	}
 	item.State = "cancelled"
 	item.UpdatedAt = time.Now().UnixMilli()
-	_ = os.Remove(filepath.Join(m.root, id+".part"))
+	_ = os.Remove(filepath.Join(m.itemDir(item), id+".part"))
 	return m.persist()
 }
 func (m *Manager) Pending() []Item {
@@ -573,7 +636,7 @@ func (m *Manager) persist() error {
 	}
 	return os.Rename(tmp, filepath.Join(m.root, "transfers.json"))
 }
-func (m *Manager) safeDestination(name string) (string, error) {
+func (m *Manager) safeDestination(dir, name string) (string, error) {
 	base := safeName(name)
 	for i := 0; i < 1000; i++ {
 		candidate := base
@@ -581,7 +644,7 @@ func (m *Manager) safeDestination(name string) (string, error) {
 			ext := filepath.Ext(base)
 			candidate = fmt.Sprintf("%s (%d)%s", strings.TrimSuffix(base, ext), i, ext)
 		}
-		path := filepath.Join(m.root, candidate)
+		path := filepath.Join(dir, candidate)
 		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
 			return path, nil
 		}

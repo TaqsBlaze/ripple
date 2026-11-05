@@ -107,6 +107,7 @@ func (server *Server) dispatch(request protocol.Request) protocol.Response {
 		if server.Transfers != nil {
 			server.Status.Transfers = server.Transfers.List()
 			server.Status.AutoAccept = server.Transfers.AutoAccept()
+			server.Status.ReceiveDir = server.Transfers.ReceiveDir()
 			items := server.Transfers.List()
 			views := make([]map[string]any, 0, len(items))
 			for _, item := range items {
@@ -141,6 +142,16 @@ func (server *Server) dispatch(request protocol.Request) protocol.Response {
 		}
 	case "drop.status":
 		response.Payload = map[string]bool{"active": server.DropState != nil && server.DropState.Active()}
+	case "drop.desktop":
+		var payload struct {
+			Active bool `json:"active"`
+		}
+		if json.Unmarshal(request.Payload, &payload) != nil || server.DropState == nil {
+			response.Error = &protocol.ErrorBody{Code: "invalid_request", Message: "Invalid desktop drop state."}
+			break
+		}
+		server.DropState.SetDesktop(payload.Active)
+		response.Payload = map[string]bool{"active": payload.Active}
 	case "pairing.invitation":
 		if server.Invitation == nil {
 			response.Error = &protocol.ErrorBody{Code: "unavailable", Message: "Pairing is unavailable."}
@@ -212,6 +223,17 @@ func (server *Server) dispatch(request protocol.Request) protocol.Response {
 			response.Error = &protocol.ErrorBody{Code: "offer_failed", Message: err.Error()}
 		} else {
 			response.Payload = map[string]any{"id": item.ID, "name": item.Name, "state": item.State, "peerName": item.PeerName}
+		}
+	case "transfer.receive_dir":
+		var payload struct {
+			Path string `json:"path"`
+		}
+		if json.Unmarshal(request.Payload, &payload) != nil || server.Transfers == nil {
+			response.Error = &protocol.ErrorBody{Code: "invalid_request", Message: "Invalid receive folder."}
+			break
+		}
+		if err := server.Transfers.SetReceiveDir(payload.Path); err != nil {
+			response.Error = &protocol.ErrorBody{Code: "folder_failed", Message: err.Error()}
 		}
 	case "transfer.auto_accept":
 		var payload struct {

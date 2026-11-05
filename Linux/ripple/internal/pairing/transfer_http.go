@@ -93,7 +93,7 @@ func (s *HTTPServer) transferInbox(w http.ResponseWriter, r *http.Request) {
 	for _, item := range items {
 		views = append(views, map[string]any{"transferId": item.ID, "name": item.Name, "size": item.Size, "mimeType": item.MIME, "sha256": item.SHA256, "state": item.State, "offset": item.Offset, "createdAt": item.CreatedAt})
 	}
-	s.respond(w, http.StatusOK, map[string]any{"transfers": views})
+	s.respond(w, http.StatusOK, map[string]any{"transfers": views, "desktopDropActive": s.DropState != nil && s.DropState.DesktopActive()})
 }
 
 func (s *HTTPServer) decideOutgoingTransfer(w http.ResponseWriter, r *http.Request) {
